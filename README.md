@@ -34,6 +34,28 @@ return LG_prefBool(@"Global.Enabled", YES);
 Without this, `Global.Enabled` defaults to `NO` and **every** surface silently
 no-ops — the tweak would install fine and do nothing.
 
+## v1.0.0-4: widget glass
+
+v4 adds `Hooks/Widgets.x`, so the **Today View / home screen widgets** get the same
+Metal refraction. Upstream ships `Widgets.Enabled` **off** by default, so the flag is
+flipped to `YES` in `Hooks/Widgets.x` — otherwise it compiles in and still renders
+nothing (the same silent-no-op class of bug as `Global.Enabled`).
+
+Still deliberately NOT compiled: `Dock`, `AppLibrary`, `AppIcons`, `FolderIcon`,
+`FolderOpen`, `SearchPill`, `ContextMenu`, `PreferencesControls`. Several of those
+default to **enabled** upstream, and turning them all on at once is exactly what
+causes the "other surfaces render black" bug. `PreferencesControls.x` additionally
+imports the prefs-bundle headers this fork no longer ships, so it can never compile.
+
+`Hooks/` intentionally keeps only `Platter.x`, `Widgets.x` and `Lockscreen/*.x`, and
+the Makefile lists them explicitly instead of using `$(wildcard Hooks/*.x)`.
+
+## Recovery (if v4 looks wrong)
+
+Widget glass is the most demanding surface on an A9. If SpringBoard goes black or
+loops: **reboot into the unjailbroken state, then re-boot while holding Volume Down**
+to enter Safe Mode (no tweaks loaded), and uninstall `com.you.liquidglasslock`.
+
 ## Build
 
 ```bash
