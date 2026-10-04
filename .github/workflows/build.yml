@@ -1,0 +1,40 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      THEOS: ${{ github.workspace }}/theos
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Theos
+        run: git clone --recursive --depth=1 https://github.com/theos/theos.git "$THEOS"
+
+      - name: Install iPhoneOS 15.6 SDK
+        run: |
+          mkdir -p "$THEOS/sdks"
+          curl -sL https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS15.6.sdk.tar.xz -o /tmp/sdk.tar.xz
+          tar -xJf /tmp/sdk.tar.xz -C "$THEOS/sdks"
+
+      - name: Install L1ghtmann iOS toolchain
+        run: |
+          sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5 || true
+          mkdir -p "$THEOS/toolchain"
+          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz -o /tmp/tc.tar.xz
+          tar -xJf /tmp/tc.tar.xz -C "$THEOS/toolchain"
+
+      - name: Build rootless package
+        run: make package THEOS_PACKAGE_SCHEME=rootless FINALPACKAGE=1
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: liquidglasslock-deb
+          path: packages/*.deb
