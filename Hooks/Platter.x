@@ -442,6 +442,65 @@ void LGLockscreenRefreshAllHosts(void) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// LiquidGlassLock v3 — lockscreen + Control Center module glass.
+//
+// Upstream only glassifies PLPlatterView-based notification hosts. A real iOS
+// 15.8.8 log showed 30 MTMaterialView instances and NOT ONE with a PLPlatterView
+// ancestor: 25 were in SBControlCenterWindow (CCUIContentModuleContainerView,
+// MRUControlCenterView, CCUIContinuousSliderView, FCUIActivityControl,
+// MediaControlsMaterialView) and 2 were full-screen coversheet backdrops.
+// Pulling down on the lockscreen therefore produced no glass at all, because
+// Control Center modules were never a supported surface.
+//
+// Accept module-sized material views in the coversheet / control center windows,
+// excluding full-screen backdrops and collapsed (0x0) views.
+// ---------------------------------------------------------------------------
+static BOOL LGIsLockOrControlCenterWindow(UIView *view) {
+    if (!view || !view.window) return NO;
+    NSString *w = NSStringFromClass(view.window.class);
+    return [w isEqualToString:@"SBCoverSheetWindow"] || [w isEqualToString:@"SBControlCenterWindow"];
+}
+
+static BOOL LGIsModuleSizedGlassCandidate(UIView *view) {
+    if (!view) return NO;
+    if (!LGIsLockOrControlCenterWindow(view)) return NO;   // home screen stays untouched
+    CGRect f = view.bounds;
+    if (f.size.width < 40.0 || f.size.height < 20.0) return NO;        // collapsed / hidden
+    if (f.size.width >= 300.0 && f.size.height >= 480.0) return NO;    // full-screen backdrop blur
+    return YES;
+}
+
+static NSHashTable<UIView *> *sLGModuleHosts = nil;
+static NSHashTable<UIView *> *LGModuleHostRegistry(void) {
+    if (!sLGModuleHosts) sLGModuleHosts = [NSHashTable weakObjectsHashTable];
+    return sLGModuleHosts;
+}
+
+static void LGInjectModuleGlassIfNeeded(UIView *view) {
+    LGAssertMainThread();
+    if (!view || !LGNotificationGlassEnabled()) return;
+    if (!LGIsModuleSizedGlassCandidate(view)) return;
+
+    NSHashTable<UIView *> *reg = LGModuleHostRegistry();
+    BOOL known = [reg containsObject:view];
+    // Perf guard: A9 cannot afford to refract an unbounded number of hosts per frame.
+    if (!known && reg.allObjects.count >= 16) return;
+
+    CGFloat radius = LGLockscreenResolvedCornerRadius(view, 18.5);
+    LGLockscreenInjectGlass(view, radius);
+    LGAttachLockHostIfNeeded(view);
+
+    if (!known) {
+        [reg addObject:view];
+        LGLLog([NSString stringWithFormat:@"[module] new host #%lu %@ frame=%@ radius=%.1f",
+                (unsigned long)reg.allObjects.count,
+                NSStringFromClass(view.class),
+                NSStringFromCGRect(view.frame),
+                radius]);
+    }
+}
+
 %group LGPlatterSpringBoard
 
 %hook MTMaterialView
@@ -483,24 +542,26 @@ void LGLockscreenRefreshAllHosts(void) {
             LGCleanupLockscreenHost(self_);
         }
     } else {
-        // LiquidGlassLock diagnostic: this is the "loaded but nothing happens" case.
-        // Record the ancestor chain so we can see what iOS 15 actually puts behind
-        // the lockscreen material views, instead of guessing.
-        static int sLGSkipLogged = 0;
-        if (sLGSkipLogged < 30) {
-            sLGSkipLogged++;
-            NSMutableArray<NSString *> *chain = [NSMutableArray array];
-            UIView *v = self_.superview;
-            for (int d = 0; v && d < 10; d++) {
-                [chain addObject:NSStringFromClass(v.class)];
-                v = v.superview;
+        if (LGIsModuleSizedGlassCandidate(self_)) {
+            LGInjectModuleGlassIfNeeded(self_);
+        } else if (LGIsLockOrControlCenterWindow(self_)) {
+            // Only log surfaces we actually target, otherwise the log is 90% home screen noise.
+            static int sLGSkipLogged = 0;
+            if (sLGSkipLogged < 30) {
+                sLGSkipLogged++;
+                NSMutableArray<NSString *> *chain = [NSMutableArray array];
+                UIView *v = self_.superview;
+                for (int d = 0; v && d < 10; d++) {
+                    [chain addObject:NSStringFromClass(v.class)];
+                    v = v.superview;
+                }
+                LGLLog([NSString stringWithFormat:
+                        @"[skip] MTMaterialView not a platter host (#%d) frame=%@ window=%@ ancestors=%@",
+                        sLGSkipLogged,
+                        NSStringFromCGRect(self_.frame),
+                        NSStringFromClass(self_.window.class),
+                        chain.count ? [chain componentsJoinedByString:@" > "] : @"(none)"]);
             }
-            LGLLog([NSString stringWithFormat:
-                    @"[skip] MTMaterialView not a platter host (#%d) frame=%@ window=%@ ancestors=%@",
-                    sLGSkipLogged,
-                    NSStringFromCGRect(self_.frame),
-                    NSStringFromClass(self_.window.class),
-                    chain.count ? [chain componentsJoinedByString:@" > "] : @"(none)"]);
         }
         return;
     }
@@ -536,6 +597,10 @@ void LGLockscreenRefreshAllHosts(void) {
         } else {
             LGCleanupLockscreenHost(self_);
         }
+    } else {
+        // LiquidGlassLock v3: coversheet / Control Center module glass.
+        // Module bounds are only final after layout, so this path matters.
+        LGInjectModuleGlassIfNeeded(self_);
     }
 }
 
