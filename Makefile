@@ -18,9 +18,13 @@ include $(THEOS)/makefiles/common.mk
 
 TWEAK_NAME = LiquidGlassLock
 
-# Lockscreen surfaces only: notification + banner platters, quick actions,
-# clock, passcode.
-HOOK_FILES := Hooks/Platter.x $(wildcard Hooks/Lockscreen/*.x)
+# v4: lockscreen surfaces + control center + widgets.
+# Explicit list, NOT $(wildcard Hooks/*.x) — several upstream hooks default to
+# ENABLED (Dock / AppLibrary / FolderIcon / FolderOpen / SearchPill / ContextMenu),
+# and turning them all on at once is exactly what produces the upstream
+# "other surfaces render black" bug. PreferencesControls.x additionally imports
+# the prefs bundle headers we no longer ship, so it must never be compiled.
+HOOK_FILES := Hooks/Platter.x Hooks/Widgets.x $(wildcard Hooks/Lockscreen/*.x)
 
 SHARED_FILES := Shared/LGSharedSupport.m \
                 Shared/LGHookSupport.m \
