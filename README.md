@@ -55,23 +55,32 @@ Files land in `/var/jb/Library/MobileSubstrate/DynamicLibraries/`.
 
 ## Verify it actually ran
 
-A successful install is **not** proof. Grep SpringBoard's syslog:
+### v1.0.0-2 and later: read the log file, no terminal needed
+
+The tweak writes to **`/var/mobile/Documents/LiquidGlassLock.log`**. Open it with **Filza**
+after a respring. Lines to look for:
+
+```
+[LiquidGlassLock] [load] loaded into com.apple.springboard | iOS 15.8.8 | globalEnabled=1 lockscreenEnabled=1
+[LiquidGlassLock] [inject] FIRST host=MTMaterialView enabled=1 radius=18.50
+[LiquidGlassLock] [skip] MTMaterialView not a platter host (#1) frame=... ancestors=... > ...
+```
+
+| Log says | Meaning | Fix |
+|---|---|---|
+| nothing at all | dylib not loaded | check `LiquidGlassLock.dylib` + `.plist` are in `/var/jb/Library/MobileSubstrate/DynamicLibraries/` |
+| `[load] ... globalEnabled=0` | prefs say off | delete `.../Preferences/com.you.liquidglasslock.plist` |
+| `[load]` but no `[inject]` and no `[skip]` | no `MTMaterialView` exists on screen | there is genuinely no notification platter / media player to glassify |
+| `[load]` + `[skip] ... ancestors=...` | views exist but iOS 15 nests them differently than `PLPlatterView` | send the ancestor chain — that dictates the next fix |
+
+### Or via syslog
 
 ```bash
 log stream --predicate 'process == "SpringBoard"' | grep LiquidGlassLock
 ```
 
-Expected:
-
-```
-[LiquidGlassLock] loaded lockscreen-only build into com.apple.springboard globalEnabled=1 lockscreenEnabled=1
-[LiquidGlassLock] inject host=MTMaterialView enabled=1 radius=18.50
-```
-
 - Only the first line → dylib loaded, but no platter host was ever seen.
 - No lines at all → dylib not loaded (check the filter plist / ElleKit).
-- `globalEnabled=0` → `Global.Enabled` got written to `NO` somewhere;
-  delete `/var/jb/var/mobile/Library/Preferences/dylv.liquidassprefs.plist`.
 
 ## License
 
