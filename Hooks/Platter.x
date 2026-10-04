@@ -483,6 +483,25 @@ void LGLockscreenRefreshAllHosts(void) {
             LGCleanupLockscreenHost(self_);
         }
     } else {
+        // LiquidGlassLock diagnostic: this is the "loaded but nothing happens" case.
+        // Record the ancestor chain so we can see what iOS 15 actually puts behind
+        // the lockscreen material views, instead of guessing.
+        static int sLGSkipLogged = 0;
+        if (sLGSkipLogged < 30) {
+            sLGSkipLogged++;
+            NSMutableArray<NSString *> *chain = [NSMutableArray array];
+            UIView *v = self_.superview;
+            for (int d = 0; v && d < 10; d++) {
+                [chain addObject:NSStringFromClass(v.class)];
+                v = v.superview;
+            }
+            LGLLog([NSString stringWithFormat:
+                    @"[skip] MTMaterialView not a platter host (#%d) frame=%@ window=%@ ancestors=%@",
+                    sLGSkipLogged,
+                    NSStringFromCGRect(self_.frame),
+                    NSStringFromClass(self_.window.class),
+                    chain.count ? [chain componentsJoinedByString:@" > "] : @"(none)"]);
+        }
         return;
     }
 }
