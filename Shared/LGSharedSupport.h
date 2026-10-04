@@ -53,6 +53,11 @@ void LGObservePreferenceChanges(dispatch_block_t block);
 
 void LGLog(NSString *format, ...);
 void LGDebugLog(NSString *format, ...);
+
+// LiquidGlassLock: file-based diagnostics. Appends to
+// /var/mobile/Documents/LiquidGlassLock.log so the user can read the state with
+// Filza, without needing a terminal / `log stream`.
+void LGLLog(NSString *line);
 void LGAssertMainThread(void);
 BOOL LGProfilingEnabled(void);
 CFTimeInterval LGProfileBegin(void);
