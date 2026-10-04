@@ -4,11 +4,13 @@
 #import <os/lock.h>
 #import <stdlib.h>
 
-NSString * const LGPrefsDomain = @"dylv.liquidassprefs";
-CFStringRef const LGPrefsChangedNotification = CFSTR("dylv.liquidassprefs/Reload");
-CFStringRef const LGPrefsRespringNotification = CFSTR("dylv.liquidassprefs/Respring");
-const char * const LGPrefsChangedNotificationCString = "dylv.liquidassprefs/Reload";
-const char * const LGPrefsRespringNotificationCString = "dylv.liquidassprefs/Respring";
+// LiquidGlassLock: own domain so a leftover Liquidass plist (which commonly has
+// Global.Enabled = NO) can never override this tweak's defaults.
+NSString * const LGPrefsDomain = @"com.you.liquidglasslock";
+CFStringRef const LGPrefsChangedNotification = CFSTR("com.you.liquidglasslock/Reload");
+CFStringRef const LGPrefsRespringNotification = CFSTR("com.you.liquidglasslock/Respring");
+const char * const LGPrefsChangedNotificationCString = "com.you.liquidglasslock/Reload";
+const char * const LGPrefsRespringNotificationCString = "com.you.liquidglasslock/Respring";
 const CGFloat LGBannerDefaultCornerRadius = 18.5;
 const CGFloat LGBannerDefaultBezelWidth = 18.0;
 const CGFloat LGBannerDefaultBlur = 40.0;
@@ -67,7 +69,9 @@ static NSString *LGLogFilePath(void) {
     static NSString *sPath = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        sPath = @"/tmp/LiquidAss.log";
+        // LiquidGlassLock: upstream wrote to /tmp/LiquidAss.log, which Filza cannot
+        // browse comfortably on a rootless install. Put it where the user can read it.
+        sPath = @"/var/mobile/Documents/LiquidGlassLock.log";
     });
     return sPath;
 }
@@ -342,6 +346,14 @@ void LGDebugLog(NSString *format, ...) {
     NSString *message = [[NSString alloc] initWithFormat:format arguments:args];
     va_end(args);
     LGLog(@"%@", message);
+}
+
+void LGLLog(NSString *line) {
+    if (!line.length) return;
+    // Unconditional (unlike LGDebugLog, which is gated by DebugLogging.Enabled).
+    // Goes to syslog AND to /var/mobile/Documents/LiquidGlassLock.log.
+    NSLog(@"[LiquidGlassLock] %@", line);
+    LGAppendLogLine([NSString stringWithFormat:@"[LiquidGlassLock] %@\n", line]);
 }
 
 void LGAssertMainThread(void) {
