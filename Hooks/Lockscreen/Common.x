@@ -374,9 +374,14 @@ void LGLockscreenInjectGlass(UIView *host, CGFloat cornerRadius) {
     // must print this line, otherwise the glass path never ran (silent no-op).
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        NSLog(@"[LiquidGlassLock] inject host=%@ enabled=%d radius=%.2f",
-              NSStringFromClass(host.class), LGLockscreenEnabled(), cornerRadius);
+        LGLLog([NSString stringWithFormat:@"[inject] FIRST host=%@ enabled=%d radius=%.2f",
+                NSStringFromClass(host.class), LGLockscreenEnabled(), cornerRadius]);
     });
+    static int sLGInjectCount = 0;
+    if (sLGInjectCount < 20) {
+        sLGInjectCount++;
+        LGLLog([NSString stringWithFormat:@"[inject] #%d host=%@", sLGInjectCount, NSStringFromClass(host.class)]);
+    }
     LGLockscreenInjectGlassWithSettings(host,
                                         cornerRadius,
                                         LGLockscreenBezelWidth(),
