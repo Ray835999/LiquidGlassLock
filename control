@@ -1,6 +1,6 @@
 Package: com.you.liquidglasslock
 Name: LiquidGlassLock
-Version: 1.0.0-1
+Version: 1.0.0-2
 Architecture: iphoneos-arm64
 Description: iOS 26 Liquid Glass for the lock screen only. Real-time Metal glass on notification/banner platters, quick actions, clock and passcode. No Home Screen / App Library / Dock / Widgets injection, so it never hits the "other surfaces go black" conflict.
 Maintainer: Ray835999
