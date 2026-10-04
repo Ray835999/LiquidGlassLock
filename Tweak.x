@@ -1509,11 +1509,13 @@ static void LG_requestRespring(void) {
 
     LGReloadPreferences();
     LGLog(@"loaded into %@", LGMainBundleIdentifier() ?: @"(unknown)");
-    // LiquidGlassLock: unconditional, greppable proof that the dylib loaded.
-    NSLog(@"[LiquidGlassLock] loaded lockscreen-only build into %@ globalEnabled=%d lockscreenEnabled=%d",
-          LGMainBundleIdentifier() ?: @"(unknown)",
-          LG_globalEnabled(),
-          LGLockscreenEnabled());
+    // LiquidGlassLock: goes to syslog AND /var/mobile/Documents/LiquidGlassLock.log
+    LGLLog([NSString stringWithFormat:
+            @"[load] loaded into %@ | iOS %@ | globalEnabled=%d lockscreenEnabled=%d | log=/var/mobile/Documents/LiquidGlassLock.log",
+            LGMainBundleIdentifier() ?: @"(unknown)",
+            UIDevice.currentDevice.systemVersion,
+            LG_globalEnabled(),
+            LGLockscreenEnabled()]);
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         LGPrewarmPipelines();
     });
